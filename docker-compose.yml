@@ -1,0 +1,58 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  db:
+    image: postgres:15-alpine
+    container_name: iam_threat_db
+    environment:
+      POSTGRES_USER: iam_user
+      POSTGRES_PASSWORD: secure_password
+      POSTGRES_DB: iam_threat_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U iam_user"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # FastAPI Application
+  app:
+    build: .
+    container_name: iam_threat_app
+    environment:
+      DATABASE_URL: postgresql://iam_user:secure_password@db:5432/iam_threat_db
+      DEBUG: "false"
+      ENVIRONMENT: production
+      SECRET_KEY: change-this-in-production
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./logs:/app/logs
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Optional: Adminer for database management
+  adminer:
+    image: adminer:latest
+    container_name: iam_threat_adminer
+    ports:
+      - "8080:8080"
+    depends_on:
+      - db
+
+volumes:
+  postgres_data:
+
+networks:
+  default:
+    name: iam-threat-network
